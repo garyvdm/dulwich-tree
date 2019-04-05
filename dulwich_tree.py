@@ -1,7 +1,4 @@
-import logging
 import stat
-import subprocess
-from contextlib import suppress
 from time import time, timezone
 
 from dulwich.errors import NotTreeError
@@ -9,6 +6,7 @@ from dulwich.objects import Blob, Commit, Tree
 from dulwich.objectspec import parse_tree
 
 EMPTY_TREE_SHA = b'4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+
 
 class TreeReader(object):
 
@@ -45,9 +43,25 @@ class TreeReader(object):
             return True
 
 
-class TreeWriter(TreeReader):
+class _RefCounted(object):
 
-    # TODO: changed_objects should have a ref count
+    __slots__ = ('ref_count', 'obj')
+
+    def __init__(self, obj, ref_count=0):
+        self.obj = obj
+        self.ref_count = ref_count
+
+    def __repr__(self):
+        return "_RefCounted({!r}, ref_count={})".format(self.obj, self.ref_count)
+
+    def inc_ref_count(self):
+        self.ref_count += 1
+
+    def dec_ref_count(self):
+        self.ref_count -= 1
+
+
+class TreeWriter(TreeReader):
 
     def __init__(self, repo, branch=b'HEAD', encoding="UTF-8"):
         self.repo = repo
@@ -66,9 +80,22 @@ class TreeWriter(TreeReader):
             self.org_tree_id = self.tree.id
         self.changed_objects = {}
 
+    def _add_changed_object(self, obj):
+        ref_counted = self.changed_objects.get(obj.id)
+        if not ref_counted:
+            self.changed_objects[obj.id] = ref_counted = _RefCounted(obj)
+        ref_counted.ref_count += 1
+
+    def _remove_changed_object(self, obj_id):
+        ref_counted = self.changed_objects.get(obj_id)
+        if ref_counted:
+            ref_counted.ref_count -= 1
+            if ref_counted.ref_count == 0:
+                del self.changed_objects[obj_id]
+
     def lookup_obj(self, sha):
         try:
-            return self.changed_objects[sha]
+            return self.changed_objects[sha].obj
         except KeyError:
             return self.repo[sha]
 
@@ -85,34 +112,25 @@ class TreeWriter(TreeReader):
                 sub_tree = self.lookup_obj(sub_tree_sha)
             old_trees.append(sub_tree)
 
-        new_objs = []
         for old_tree, name in reversed(tuple(zip(old_trees, path_items))):
             new_tree = old_tree.copy()
 
             if obj is None or obj.id == EMPTY_TREE_SHA:
-                if name not in new_tree:
-                    raise KeyError(name)
+                old_obj_id, _ = new_tree[name]
+                self._remove_changed_object(old_obj_id)
                 del new_tree[name]
                 # print(f'del old: {old_tree} new: {new_tree} name: {name}')
             else:
-                obj_id = obj.id
-                new_objs.append(obj)
-                new_tree[name] = (mode, obj_id)
+                self._add_changed_object(obj)
+                new_tree[name] = (mode, obj.id)
                 # print(f'set old: {old_tree} new: {new_tree} name: {name} obj_id: {obj_id}')
 
             obj = new_tree
             mode = stat.S_IFDIR
 
-        new_objs.append(obj)
+        self._remove_changed_object(old_tree)
+        self._add_changed_object(obj)
         self.tree = obj
-
-        # print(f'old: {old_trees} new: {new_objs}')
-        for old_tree in old_trees:
-            if old_tree:
-                with suppress(KeyError):
-                    del self.changed_objects[old_tree.id]
-        for obj in new_objs:
-            self.changed_objects[obj.id] = obj
 
     def set_data(self, path, data, mode=stat.S_IFREG | 0o644):
         obj = Blob()
@@ -141,8 +159,8 @@ class TreeWriter(TreeReader):
             commit.parents = [self.org_commit_id]
 
         commit_id = commit.id
-        self.changed_objects[commit_id] = commit
-        self.repo.object_store.add_objects([(obj, None) for obj in self.changed_objects.values()])
+        self._add_changed_object(commit)
+        self.repo.object_store.add_objects([(ref_counted.obj, None) for ref_counted in self.changed_objects.values()])
         self.repo.refs.set_if_equals(self.branch, self.org_commit_id, commit_id)
 
         self.reset()
