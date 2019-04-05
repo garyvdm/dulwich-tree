@@ -1,8 +1,7 @@
 import stat
-from time import time, timezone
 
 from dulwich.errors import NotTreeError
-from dulwich.objects import Blob, Commit, Tree
+from dulwich.objects import Blob, Tree
 from dulwich.objectspec import parse_tree
 
 EMPTY_TREE_SHA = b'4b825dc642cb6eb9a060e54bf8d69288fbee4904'
@@ -63,15 +62,15 @@ class _RefCounted(object):
 
 class TreeWriter(TreeReader):
 
-    def __init__(self, repo, branch=b'HEAD', encoding="UTF-8"):
+    def __init__(self, repo, ref=b'HEAD', encoding="UTF-8"):
         self.repo = repo
         self.encoding = encoding
-        self.branch = branch
+        self.ref = ref
         self.reset()
 
     def reset(self):
         try:
-            self.org_commit_id = self.repo.refs[self.branch]
+            self.org_commit_id = self.repo.refs[self.ref]
         except KeyError:
             self.org_commit_id = None
             self.tree = Tree()
@@ -141,26 +140,11 @@ class TreeWriter(TreeReader):
     def remove(self, path):
         self.set(path, None, None)
 
-    def commit(self, message, author=None):
-        commit = Commit()
-        commit.tree = self.tree.id
-        if author is None:
-            config = self.repo.get_config_stack()
-            author = self.repo._get_user_identity(config)
-        else:
-            author = author.encode(self.encoding)
-        commit.author = commit.committer = author
-        commit.commit_time = commit.author_time = int(time())
-        tz = timezone
-        commit.commit_timezone = commit.author_timezone = tz
-        commit.message = message.encode(self.encoding)
-        commit.encoding = self.encoding.encode('ascii')
-        if self.org_commit_id:
-            commit.parents = [self.org_commit_id]
-
-        commit_id = commit.id
-        self._add_changed_object(commit)
+    def add_changed_to_object_store(self):
         self.repo.object_store.add_objects([(ref_counted.obj, None) for ref_counted in self.changed_objects.values()])
-        self.repo.refs.set_if_equals(self.branch, self.org_commit_id, commit_id)
 
+    def do_commit(self, **kwargs):
+        self.add_changed_to_object_store()
+        ret = self.repo.do_commit(tree=self.tree.id, ref=self.ref, **kwargs)
         self.reset()
+        return ret

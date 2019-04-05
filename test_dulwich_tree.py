@@ -51,24 +51,24 @@ class TestTreeWriter(unittest.TestCase):
         writer = TreeWriter(repo)
         writer.set_data('a', b'file a',)
         self.assertEqual(b'file a', writer.get('a').data)
-        writer.commit('Add a.')
+        writer.do_commit(message=b'Add a.')
         self.assertEqual(b'file a', writer.get('a').data)
         self.assertEqual(b'file a', TreeReader(repo).get('a').data)
 
         writer.set_data('b/c', b'file c',)
-        writer.commit('Add b/c.')
+        writer.do_commit(message=b'Add b/c.')
         self.assertEqual(b'file c', writer.get('b/c').data)
 
         writer.set_data('b/c', b'file c ver 2',)
-        writer.commit('Modify b/c.')
+        writer.do_commit(message=b'Modify b/c.')
         self.assertEqual(b'file c ver 2', writer.get('b/c').data)
 
         writer.remove('a')
-        writer.commit('Remove a.')
+        writer.do_commit(message=b'Remove a.')
         self.assertFalse(writer.exists('a'))
 
         writer.remove('b/c')
-        writer.commit('Remove b/c.')
+        writer.do_commit(message=b'Remove b/c.')
         self.assertFalse(writer.exists('b/c'))
 
     def test_rm_non_existant(self):
