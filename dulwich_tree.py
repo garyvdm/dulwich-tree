@@ -7,7 +7,7 @@ from dulwich.objectspec import parse_tree
 EMPTY_TREE_SHA = b"4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 
-class TreeReader(object):
+class TreeReader:
     def __init__(self, repo, treeish="HEAD", encoding="UTF-8"):
         self.repo = repo
         self.treeish = treeish
@@ -41,7 +41,7 @@ class TreeReader(object):
             return True
 
 
-class _RefCounted(object):
+class _RefCounted:
 
     __slots__ = ("ref_count", "obj")
 
