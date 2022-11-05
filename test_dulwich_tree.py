@@ -1,7 +1,5 @@
-import os.path
 import unittest
 
-import dulwich.tests
 from dulwich.errors import NotTreeError
 from dulwich.repo import MemoryRepo, Repo
 
@@ -10,7 +8,7 @@ from dulwich_tree import TreeReader, TreeWriter
 
 class TestTreeReader(unittest.TestCase):
     def setUp(self):
-        repo = Repo(os.path.join(dulwich.tests.__path__[0], "data/repos/a.git"))
+        repo = Repo("test_data/a.git")
         self.reader = TreeReader(repo)
 
     def test_lookup(self):
