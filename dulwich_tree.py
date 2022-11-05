@@ -8,6 +8,8 @@ from dulwich.repo import Repo
 from dulwich.refs import Ref as DulwichRef
 
 
+__all__ = ["Ref", "TreeReader", "TreeWriter"]
+
 Ref = Union[str, DulwichRef]
 
 EMPTY_TREE_SHA = b"4b825dc642cb6eb9a060e54bf8d69288fbee4904"

@@ -1,0 +1,31 @@
+[project]
+name = "dulwich-tree"
+version = "0.2.dev0"
+authors = [
+    {name = "Gary van der Merwe", email = "garyvdm@gmail.com"},
+]
+description = "Library to help make and commit modifications to a tree with Dulwich."
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: Software Development :: Version Control",
+]
+dependencies = [
+    "dulwich",
+]
+
+[project.urls]
+Source = "https://github.com/garyvdm/dulwich-tree"
+
+[tool.flit.module]
+name = "dulwich_tree"
+
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.isort]
+profile = "black"
