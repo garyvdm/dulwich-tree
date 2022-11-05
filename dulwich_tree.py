@@ -4,12 +4,11 @@ from dulwich.errors import NotTreeError
 from dulwich.objects import Blob, Tree
 from dulwich.objectspec import parse_tree
 
-EMPTY_TREE_SHA = b'4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+EMPTY_TREE_SHA = b"4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 
 class TreeReader(object):
-
-    def __init__(self, repo, treeish='HEAD', encoding="UTF-8"):
+    def __init__(self, repo, treeish="HEAD", encoding="UTF-8"):
         self.repo = repo
         self.treeish = treeish
         self.tree = None
@@ -44,7 +43,7 @@ class TreeReader(object):
 
 class _RefCounted(object):
 
-    __slots__ = ('ref_count', 'obj')
+    __slots__ = ("ref_count", "obj")
 
     def __init__(self, obj, ref_count=0):
         self.obj = obj
@@ -61,8 +60,7 @@ class _RefCounted(object):
 
 
 class TreeWriter(TreeReader):
-
-    def __init__(self, repo, ref=b'HEAD', encoding="UTF-8"):
+    def __init__(self, repo, ref=b"HEAD", encoding="UTF-8"):
         self.repo = repo
         self.encoding = encoding
         self.ref = ref
@@ -99,7 +97,7 @@ class TreeWriter(TreeReader):
             return self.repo[sha]
 
     def set(self, path, obj, mode):
-        path_items = path.encode(self.encoding).split(b'/')
+        path_items = path.encode(self.encoding).split(b"/")
         sub_tree = self.tree
         old_trees = [sub_tree]
         for name in path_items[:-1]:
@@ -141,7 +139,9 @@ class TreeWriter(TreeReader):
         self.set(path, None, None)
 
     def add_changed_to_object_store(self):
-        self.repo.object_store.add_objects([(ref_counted.obj, None) for ref_counted in self.changed_objects.values()])
+        self.repo.object_store.add_objects(
+            [(ref_counted.obj, None) for ref_counted in self.changed_objects.values()]
+        )
 
     def do_commit(self, **kwargs):
         self.add_changed_to_object_store()
