@@ -22,4 +22,4 @@ var/
 .eggs/
 AUTHORS
 ChangeLog
-
+.tox/
