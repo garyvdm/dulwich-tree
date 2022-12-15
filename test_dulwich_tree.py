@@ -13,7 +13,8 @@ class TestTreeReader(unittest.TestCase):
 
     def test_lookup(self):
         self.assertEqual(
-            (33188, b"4ef30bbfe26431a69c3820d3a683df54d688f2ec"), self.reader.lookup("a")
+            (33188, b"4ef30bbfe26431a69c3820d3a683df54d688f2ec"),
+            self.reader.lookup("a"),
         )
 
     def test_get(self):

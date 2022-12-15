@@ -2,11 +2,10 @@ import stat
 from typing import Dict, List, Optional, Sequence, Union, cast
 
 from dulwich.errors import NotTreeError
-from dulwich.objects import Blob, Tree, ShaFile, ObjectID
+from dulwich.objects import Blob, ObjectID, ShaFile, Tree
 from dulwich.objectspec import parse_tree
-from dulwich.repo import Repo
 from dulwich.refs import Ref as DulwichRef
-
+from dulwich.repo import Repo
 
 __all__ = ["Ref", "TreeReader", "TreeWriter"]
 
@@ -122,11 +121,9 @@ class TreeWriter(TreeReader):
                 old_obj_id, _ = new_tree[name]
                 self._remove_changed_object(old_obj_id)
                 del new_tree[name]
-                # print(f'del old: {old_tree} new: {new_tree} name: {name}')
             else:
                 self._add_changed_object(obj)
                 new_tree[name] = (mode, obj.id)
-                # print(f'set old: {old_tree} new: {new_tree} name: {name} obj_id: {obj_id}')
 
             obj = new_tree
             mode = stat.S_IFDIR
