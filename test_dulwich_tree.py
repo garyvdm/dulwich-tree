@@ -33,7 +33,6 @@ class TestTreeReader(unittest.TestCase):
 
 
 class TestTreeWriter(unittest.TestCase):
-
     # TODO Test the commit that gets created.
 
     def test(self):

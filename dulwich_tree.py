@@ -51,7 +51,6 @@ class TreeReader:
 
 
 class _RefCounted:
-
     __slots__ = ("ref_count", "obj")
 
     def __init__(self, obj: ShaFile, ref_count: int = 0):
