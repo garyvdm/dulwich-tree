@@ -1,11 +1,12 @@
 import stat
-from typing import Dict, List, Optional, Sequence, Union, cast
+import time
+from typing import Dict, Optional, Sequence, Union, cast
 
-from dulwich.errors import NotTreeError
-from dulwich.objects import Blob, ObjectID, ShaFile, Tree
+from dulwich.errors import NotTreeError, CommitError
+from dulwich.objects import Blob, ObjectID, ShaFile, Tree, Commit
 from dulwich.objectspec import parse_tree
 from dulwich.refs import Ref as DulwichRef
-from dulwich.repo import Repo
+from dulwich.repo import Repo, get_user_identity, check_user_identity
 
 __all__ = ["Ref", "TreeReader", "TreeWriter"]
 
@@ -22,6 +23,8 @@ class TreeReader:
         self.treeish = treeish
         self.lookup_obj = repo.__getitem__
         self.encoding = encoding
+        # TODO use config encoding
+        # encoding = config.get(("i18n",), "commitEncoding")
         self.reset()
 
     def reset(self) -> None:
@@ -147,34 +150,125 @@ class TreeWriter(TreeReader):
 
     def do_commit(
         self,
-        message: Optional[bytes] = None,
-        committer: Optional[bytes] = None,
-        author: Optional[bytes] = None,
+        message: Union[str, bytes],
+        committer: Optional[Union[str, bytes]] = None,
+        author: Optional[Union[str, bytes]] = None,
         commit_timestamp=None,
         commit_timezone=None,
         author_timestamp=None,
         author_timezone=None,
-        encoding: Optional[bytes] = None,
-        merge_heads: Optional[List[bytes]] = None,
-        no_verify: bool = False,
         sign: bool = False,
     ):
+        """Commit changes.
+
+        If not specified, committer and author default to
+        get_user_identity(..., 'COMMITTER')
+        and get_user_identity(..., 'AUTHOR') respectively.
+
+        Args:
+          message: Commit message (bytes or callable that takes (repo, commit)
+            and returns bytes)
+          committer: Committer fullname
+          author: Author fullname
+          commit_timestamp: Commit timestamp (defaults to now)
+          commit_timezone: Commit timestamp timezone (defaults to GMT)
+          author_timestamp: Author timestamp (defaults to commit
+            timestamp)
+          author_timezone: Author timestamp timezone
+            (defaults to commit timestamp timezone)
+          sign: GPG Sign the commit (bool, defaults to False,
+            pass True to use default GPG key,
+            pass a str containing Key ID to use a specific GPG key)
+
+        Returns:
+          New commit SHA1
+        """
+        c = Commit()
+        c.tree = self.tree.id
+
+        config = self.repo.get_config_stack()
+        if committer is None:
+            committer = get_user_identity(config, kind="COMMITTER")
+        elif isinstance(committer, str):
+            committer = committer.encode(self.encoding)
+        check_user_identity(committer)
+        c.committer = committer
+        if commit_timestamp is None:
+            commit_timestamp = time.time()
+        c.commit_time = int(commit_timestamp)
+        if commit_timezone is None:
+            # FIXME: Use current user timezone rather than UTC
+            commit_timezone = 0
+        c.commit_timezone = commit_timezone
+        if author is None:
+            author = get_user_identity(config, kind="AUTHOR")
+        elif isinstance(author, str):
+            author = author.encode(self.encoding)
+        c.author = author
+        check_user_identity(author)
+        if author_timestamp is None:
+            author_timestamp = commit_timestamp
+        c.author_time = int(author_timestamp)
+        if author_timezone is None:
+            author_timezone = commit_timezone
+        c.author_timezone = author_timezone
+        c.encoding = self.encoding.encode()
+
+        try:
+            old_head = self.repo.refs[self.ref]
+        except KeyError:
+            old_head = None
+
+        if old_head:
+            c.parents = [old_head]
+        else:
+            c.parents = []
+
+        if isinstance(message, str):
+            message = message.encode(self.encoding)
+        c.message = message
+
+        # Check if we should sign the commit
+        should_sign = sign
+        if sign is None:
+            # Check commit.gpgSign configuration when sign is not explicitly set
+            try:
+                should_sign = config.get_boolean((b"commit",), b"gpgSign")
+            except KeyError:
+                should_sign = False  # Default to not signing if no config
+        keyid = sign if isinstance(sign, str) else None
+
+        if should_sign:
+            c.sign(keyid)
+
+        self._add_changed_object(c)
         self.add_changed_to_object_store()
-        ret = self.repo.do_commit(
-            tree=self.tree.id,
-            ref=self.ref,
-            # From args
-            message=message,
-            committer=committer,
-            author=author,
-            commit_timestamp=commit_timestamp,
-            commit_timezone=commit_timezone,
-            author_timestamp=author_timestamp,
-            author_timezone=author_timezone,
-            encoding=encoding,
-            merge_heads=merge_heads,
-            no_verify=no_verify,
-            sign=sign,
-        )
+
+        if old_head:
+            ok = self.repo.refs.set_if_equals(
+                self.ref,
+                old_head,
+                c.id,
+                message=b"commit: " + c.message,
+                committer=c.committer,
+                timestamp=c.commit_time,
+                timezone=c.commit_timezone,
+            )
+        else:
+            ok = self.repo.refs.add_if_new(
+                self.ref,
+                c.id,
+                message=b"commit: " + c.message,
+                committer=c.committer,
+                timestamp=c.commit_timezone,
+                timezone=c.commit_timezone,
+            )
+
+        if not ok:
+            # Fail if the atomic compare-and-swap failed, leaving the
+            # commit and all its objects as garbage.
+            raise CommitError(f"{self.ref!r} changed during commit")
+
         self.reset()
-        return ret
+
+        return c.id
