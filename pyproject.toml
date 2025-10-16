@@ -1,6 +1,6 @@
 [project]
 name = "dulwich-tree"
-version = "0.2"
+version = "0.3"
 authors = [
     {name = "Gary van der Merwe", email = "garyvdm@gmail.com"},
 ]
