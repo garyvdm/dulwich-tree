@@ -34,10 +34,10 @@ class TreeReader:
         _, sha = self.tree.lookup_path(self.lookup_obj, path.encode(self.encoding))
         return self.lookup_obj(sha)
 
-    def tree_items(self, path) -> Sequence[str]:
+    def tree_items(self, path: str) -> Sequence[str]:
         tree = self.get(path)
         if not isinstance(tree, Tree):
-            raise NotTreeError(path)
+            raise NotTreeError(path.encode(self.encoding))
 
         return [item.decode(self.encoding) for item in tree]
 

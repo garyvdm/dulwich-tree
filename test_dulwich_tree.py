@@ -21,7 +21,7 @@ class TestTreeReader(unittest.TestCase):
         self.assertEqual(b"file a\n", self.reader.get("a").as_raw_string())
 
     def test_tree_items(self):
-        self.assertEqual(["a", "b", "c"], self.reader.tree_items("/"))
+        self.assertEqual(["a", "b", "c"], self.reader.tree_items(""))
 
     def test_tree_items_not_tree_error(self):
         with self.assertRaises(NotTreeError):
